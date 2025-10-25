@@ -16,10 +16,8 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Backdrop para desenfoque cuando hay ventanas/menus abiertos -->
   <div id="backdrop" class="hidden" aria-hidden="true"></div>
 
-  <!-- Protección / overlay cuando se detecta devtools -->
   <div id="protection-overlay" class="hidden" aria-hidden="true">
     <div class="overlay-card">
       <h2>Acceso restringido</h2>
@@ -28,7 +26,6 @@
     </div>
   </div>
 
-  <!-- Flash inicial -->
   <div id="loader">
     <div class="windows-logo" aria-hidden="true">
       <div class="window-pane"></div>
@@ -39,17 +36,14 @@
     <div class="loader-text">SYSACCESSVIP</div>
   </div>
 
-  <!-- Fondo con banner de bienvenida (estilo simple) -->
   <div class="desktop-background">
     <div class="welcome-banner" id="welcome-banner" role="banner">
       <h1>SYSACCESSVIP</h1>
-      <p>Desarrollo Web con Estilo Windows 7</p>
+      <p>Desarrollo Web</p>
     </div>
   </div>
 
-  <!-- Escritorio -->
   <div class="desktop" id="desktop" aria-hidden="false">
-    <!-- Ventana de bienvenida -->
     <div id="welcome-window" class="window centered">
       <div class="window-header">
         <span>Bienvenido</span>
@@ -58,13 +52,12 @@
       <div class="window-body">
         <div class="win7-content">
           <h2>Desarrollo Web Profesional</h2>
-          <p>Interfaces estilo Windows 7, sistemas personalizados y soporte continuo.</p>
+          <p>Interfaces estilos Profesionales, sistemas personalizados y soporte continuo.</p>
           <button class="btn-primary" onclick="openWindow('servicios')">Ver Servicios</button>
         </div>
       </div>
     </div>
 
-    <!-- Íconos del escritorio -->
     <div class="desktop-icon" onclick="openWindow('servicios')">
       <svg class="icon win-icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" fill="#0078D7" />
@@ -95,7 +88,6 @@
     </div>
   </div>
 
-  <!-- Ventanas -->
   <div id="servicios-window" class="window centered hidden">
     <div class="window-header">
       <span>Servicios - SYSACCESSVIP</span>
@@ -105,7 +97,7 @@
       <div class="win7-content">
         <h2 class="win7-title">SERVICIOS PROFESIONALES</h2>
         <div class="service-list">
-          <div class="service-item"><strong>💻 Sitios Web Estilo Windows 7</strong><br>Interfaz clásica con funcionalidad moderna.</div>
+          <div class="service-item"><strong>💻 Sitios Web</strong><br>Interfaz clásica con funcionalidad moderna.</div>
           <div class="service-item"><strong>📊 Dashboards Personalizados</strong><br>Gráficos, tablas y gestión en tiempo real.</div>
           <div class="service-item"><strong>🔌 Integración con APIs</strong><br>Conectamos tu sistema con herramientas externas.</div>
           <div class="service-item"><strong>🛠️ Soporte Técnico 24/7</strong><br>Asistencia post-implementación incluida.</div>
@@ -153,7 +145,7 @@
           <div class="payment-method">Tarjeta</div>
           <div class="payment-method">Transferencia</div>
         </div>
-        <p class="note">También aceptamos PayPal o criptomonedas bajo consulta.</p>
+        <p class="note">También aceptamos PayPal.</p>
         <div style="text-align: center; margin-top: 20px;">
           <button class="btn-success" onclick="window.open('https://wa.me/51960436357', '_blank')">Confirmar Pago</button>
         </div>
@@ -182,10 +174,8 @@
     </div>
   </div>
 
-  <!-- Barra de tareas -->
   <div class="taskbar" role="navigation" aria-label="Barra de tareas">
     <div class="start-button" id="start-button" onclick="toggleStartMenu()" role="button" aria-haspopup="true" aria-expanded="false" title="Inicio">
-      <!-- SVG icono Windows -->
       <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
         <path fill="#ffffff" d="M3 5.5l7-.7v7.2h-7zM3 12.5l7-.7v7.7l-7-.6zM11.8 4.3l9-1v8.7l-9 .3zM11.8 13.9l9-1v8.1l-9 .4z"></path>
       </svg>
@@ -212,7 +202,6 @@
       </div>
     </div>
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>
