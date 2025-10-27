@@ -1,207 +1,1295 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SYSACCESSVIP</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Music Player</title>
 
-  <link rel="apple-touch-icon" sizes="180x180" href="favicon_io/apple-touch-icon.png?v=1">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon_io/favicon-32x32.png?v=1">
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon_io/favicon-16x16.png?v=1">
-  <link rel="shortcut icon" href="favicon_io/favicon.ico?v=1" type="image/x-icon">
-  <link rel="manifest" href="favicon_io/site.webmanifest?v=1">
-  <meta name="theme-color" content="#0078d7">
-  <meta name="msapplication-TileColor" content="#0078d7">
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#111827" />
 
-  <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; overscroll-behavior: none; }
+        ::-webkit-scrollbar { display: none; }
+
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        #full-player { transition: transform 0.3s ease-in-out; will-change: transform; }
+        #mini-player { transition: transform 0.3s ease-in-out, opacity 0.3s; will-change: transform, opacity; }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        #player-video-container { width: 100%; max-width: 640px; margin: 0 auto; position: relative; background: #000; border-radius: .5rem; overflow: hidden; height: 0; padding-top: 56.25%; }
+        #player-video-container iframe, #player-video-container > div { position: absolute !important; top: 0; left: 0; width: 100% !important; height: 100% !important; border: 0; display: block; }
+
+        #player-iframe-wrapper { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; pointer-events: none; }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 60; }
+        .modal { background: #0f1724; color: white; padding: 1rem; border-radius: .5rem; width: 360px; max-width: calc(100% - 32px); }
+        .modal h3 { margin-bottom: .5rem; }
+
+        .toast { position: fixed; right: 16px; bottom: 16px; background: rgba(17,24,39,0.95); color: white; padding: 10px 14px; border-radius: 8px; z-index: 70; box-shadow: 0 6px 18px rgba(2,6,23,0.6); }
+    </style>
 </head>
-<body>
-  <div id="backdrop" class="hidden" aria-hidden="true"></div>
+<body class="bg-gray-900 text-white h-full overflow-hidden flex flex-col">
 
-  <div id="protection-overlay" class="hidden" aria-hidden="true">
-    <div class="overlay-card">
-      <h2>Acceso restringido</h2>
-      <p>Se ha detectado una interacción no autorizada con la página. Si esto es un error, recargue la página.</p>
-      <button id="overlay-reload">Recargar</button>
-    </div>
-  </div>
-
-  <div id="loader">
-    <div class="windows-logo" aria-hidden="true">
-      <div class="window-pane"></div>
-      <div class="window-pane"></div>
-      <div class="window-pane"></div>
-      <div class="window-pane"></div>
-    </div>
-    <div class="loader-text">SYSACCESSVIP</div>
-  </div>
-
-  <div class="desktop-background">
-    <div class="welcome-banner" id="welcome-banner" role="banner">
-      <h1>SYSACCESSVIP</h1>
-      <p>Desarrollo Web</p>
-    </div>
-  </div>
-
-  <div class="desktop" id="desktop" aria-hidden="false">
-    <div id="welcome-window" class="window centered">
-      <div class="window-header">
-        <span>Bienvenido</span>
-        <button class="close-btn" onclick="closeWindow('welcome')" aria-label="Cerrar">✖</button>
-      </div>
-      <div class="window-body">
-        <div class="win7-content">
-          <h2>Desarrollo Web Profesional</h2>
-          <p>Interfaces estilos Profesionales, sistemas personalizados y soporte continuo.</p>
-          <button class="btn-primary" onclick="openWindow('servicios')">Ver Servicios</button>
+    <!-- Sidebar -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+    <div id="sidebar" class="fixed top-0 left-0 w-64 h-full bg-gray-800 z-50 shadow-lg transform -translate-x-full">
+        <div class="p-4 flex justify-between items-center">
+            <h2 class="text-xl font-bold">Menú</h2>
+            <button id="close-sidebar-btn" class="p-2 rounded-full hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
-      </div>
-    </div>
+        <nav class="mt-4">
+            <a href="#" class="nav-link flex items-center p-4 text-lg hover:bg-gray-700" data-page="home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V9a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Inicio
+            </a>
+            <a href="#" class="nav-link flex items-center p-4 text-lg hover:bg-gray-700" data-page="favorites">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 19.5l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                </svg>
+                Favoritos
+            </a>
+            <a href="#" class="nav-link flex items-center p-4 text-lg hover:bg-gray-700" data-page="recents">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Recientes
+            </a>
+            <a href="#" id="create-app-playlist-link" class="flex items-center p-4 text-lg hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Crear Playlist
+            </a>
+        </nav>
 
-    <div class="desktop-icon" onclick="openWindow('servicios')">
-      <svg class="icon win-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="2" fill="#0078D7" />
-        <path d="M9,7H15V9H9V7M9,11H15V13H9V11M9,15H15V17H9V15Z" fill="white" />
-      </svg>
-      <span>Servicios</span>
-    </div>
-
-    <div class="desktop-icon" onclick="openWindow('portafolio')">
-      <svg class="icon win-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#0078D7" d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A2,2 0 0,0 10,9A2,2 0 0,0 12,11A2,2 0 0,0 14,9A2,2 0 0,0 12,7M4,6V8H20V6H4Z" />
-      </svg>
-      <span>Portafolio</span>
-    </div>
-
-    <div class="desktop-icon" onclick="openWindow('pagos')">
-      <svg class="icon win-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20,8H4V6H20M20,18H4V12H20M20,10H4V8H20M20,16H4V14H20M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" fill="#0078D7" />
-      </svg>
-      <span>Pagos</span>
-    </div>
-
-    <div class="desktop-icon" onclick="openWindow('contacto')">
-      <svg class="icon win-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#0078D7" d="M20,8H4V6H20M20,18H4V12H20M20,10H4V8H20M20,16H4V14H20M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4Z" />
-      </svg>
-      <span>Contacto</span>
-    </div>
-  </div>
-
-  <div id="servicios-window" class="window centered hidden">
-    <div class="window-header">
-      <span>Servicios - SYSACCESSVIP</span>
-      <button class="close-btn" onclick="closeWindow('servicios')" aria-label="Cerrar">✖</button>
-    </div>
-    <div class="window-body">
-      <div class="win7-content">
-        <h2 class="win7-title">SERVICIOS PROFESIONALES</h2>
-        <div class="service-list">
-          <div class="service-item"><strong>💻 Sitios Web</strong><br>Interfaz clásica con funcionalidad moderna.</div>
-          <div class="service-item"><strong>📊 Dashboards Personalizados</strong><br>Gráficos, tablas y gestión en tiempo real.</div>
-          <div class="service-item"><strong>🔌 Integración con APIs</strong><br>Conectamos tu sistema con herramientas externas.</div>
-          <div class="service-item"><strong>🛠️ Soporte Técnico 24/7</strong><br>Asistencia post-implementación incluida.</div>
+        <div class="mt-6 px-3">
+            <h3 class="text-sm text-gray-400 mb-2">Playlists (Locales)</h3>
+            <div id="app-playlists-list" class="space-y-2 px-1"></div>
         </div>
-        <div style="margin-top: 20px; text-align: center;">
-          <button class="btn-success" onclick="window.open('https://wa.me/51960436357', '_blank')">Contratar Ahora</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div id="portafolio-window" class="window centered hidden">
-    <div class="window-header">
-      <span>Portafolio - SYSACCESSVIP</span>
-      <button class="close-btn" onclick="closeWindow('portafolio')" aria-label="Cerrar">✖</button>
-    </div>
-    <div class="window-body">
-      <div class="win7-content">
-        <h2 class="win7-title">PROYECTOS DESTACADOS</h2>
-        <div class="portfolio-grid">
-          <div class="portfolio-item">Dashboard Admin</div>
-          <div class="portfolio-item">Sistema de Ventas</div>
-          <div class="portfolio-item">Intranet Corporativa</div>
-          <div class="portfolio-item">App de Gestión</div>
+        <div class="mt-6 px-3">
+            <h3 class="text-sm text-gray-400 mb-2">Últimas escuchadas</h3>
+            <div id="sidebar-recents-list" class="space-y-2 px-1 text-xs text-gray-300"></div>
         </div>
-        <p style="margin-top: 16px;">¿Quieres ver más? ¡Escríbeme por WhatsApp!</p>
-        <div style="text-align: center; margin-top: 12px;">
-          <button class="btn-success" onclick="window.open('https://wa.me/51960436357', '_blank')">Ver Más Proyectos</button>
-        </div>
-      </div>
     </div>
-  </div>
 
-  <div id="pagos-window" class="window centered hidden">
-    <div class="window-header">
-      <span>Pagos - SYSACCESSVIP</span>
-      <button class="close-btn" onclick="closeWindow('pagos')" aria-label="Cerrar">✖</button>
-    </div>
-    <div class="window-body">
-      <div class="win7-content">
-        <h2 class="win7-title">MEDIOS DE PAGO</h2>
-        <div class="payment-grid">
-          <div class="payment-method">Yape</div>
-          <div class="payment-method">Plin</div>
-          <div class="payment-method">Tarjeta</div>
-          <div class="payment-method">Transferencia</div>
-        </div>
-        <p class="note">También aceptamos PayPal.</p>
-        <div style="text-align: center; margin-top: 20px;">
-          <button class="btn-success" onclick="window.open('https://wa.me/51960436357', '_blank')">Confirmar Pago</button>
-        </div>
-      </div>
-    </div>
-  </div>
+    <!-- Main content -->
+    <div id="main-content" class="flex-1 flex flex-col overflow-hidden relative">
+        <header class="bg-gray-900/80 backdrop-blur-sm sticky top-0 z-30 flex items-center p-4 shadow-md">
+            <button id="open-sidebar-btn" class="p-2 rounded-full hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            
+            <div class="flex-1 mx-4">
+                <div class="relative">
+                    <input type="search" id="search-input" class="w-full bg-gray-700 text-white rounded-full py-2 px-4 pl-10" placeholder="Buscar canciones, artistas o playlists...">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button id="search-button" class="p-2 rounded-full bg-blue-600 hover:bg-blue-500" title="Buscar vídeos">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+                <button id="search-playlists-button" class="p-2 rounded-full bg-green-600 hover:bg-green-500" title="Buscar playlists">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6m0 0L5 10m4-4 4 4M3 10h4m8 9v-7m0 0l4 4m-4-4-4 4M7 6h10" />
+                    </svg>
+                </button>
+            </div>
+        </header>
 
-  <div id="contacto-window" class="window centered hidden">
-    <div class="window-header">
-      <span>Contacto - SYSACCESSVIP</span>
-      <button class="close-btn" onclick="closeWindow('contacto')" aria-label="Cerrar">✖</button>
+        <main id="page-container" class="flex-1 overflow-y-auto pb-24">
+            <div id="page-home" class="page active p-4">
+                <h1 id="home-title" class="text-3xl font-bold mb-6">Inicio</h1>
+
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold mb-4">Categorías</h2>
+                    <div class="flex space-x-3 overflow-x-auto pb-2">
+                        <button class="category-btn flex-shrink-0 px-4 py-2 bg-gray-700 rounded-full font-medium" data-category="Rock">Rock</button>
+                        <button class="category-btn flex-shrink-0 px-4 py-2 bg-gray-700 rounded-full font-medium" data-category="Pop">Pop</button>
+                        <button class="category-btn flex-shrink-0 px-4 py-2 bg-gray-700 rounded-full font-medium" data-category="Latin">Latino</button>
+                        <button class="category-btn flex-shrink-0 px-4 py-2 bg-gray-700 rounded-full font-medium" data-category="Hip Hop">Hip Hop</button>
+                        <button class="category-btn flex-shrink-0 px-4 py-2 bg-gray-700 rounded-full font-medium" data-category="Electronic">Electrónica</button>
+                    </div>
+                </div>
+                
+                <div id="results-container" class="mb-6"></div>
+
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold mb-4">Playlists</h2>
+                    <div id="playlists-container" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4">Música Popular</h2>
+                    <div id="popular-music-container"></div>
+                </div>
+            </div>
+
+            <div id="page-favorites" class="page p-4">
+                <h1 class="text-3xl font-bold mb-6">Mis Favoritos</h1>
+                <div id="favorites-container"></div>
+            </div>
+
+            <div id="page-recents" class="page p-4">
+                <h1 class="text-3xl font-bold mb-6">Recientes</h1>
+                <div id="recents-container"></div>
+            </div>
+        </main>
     </div>
-    <div class="window-body">
-      <div class="win7-content">
-        <h2 class="win7-title">¿LISTO PARA EMPEZAR?</h2>
-        <p>Contáctame y construyamos juntos tu solución digital.</p>
-        <div style="margin-top: 20px; text-align: center;">
-          <a href="https://wa.me/51960436357" target="_blank" class="btn-whatsapp">
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-              <path fill="currentColor" d="M17.472,14.382C17.112,14.204 16.653,14.305 16.375,14.584L14.315,16.644C13.199,16.219 11.774,15.331 10.33,13.887C9.396,12.954 8.738,11.796 8.56,11.436C8.282,11.158 8.383,10.699 8.56,10.339L10.62,8.28C10.727,8.173 10.727,8.013 10.62,7.906L9.56,6.846C8.544,7.862 7.224,9.382 6.824,11.816C6.504,13.766 7.039,15.367 8.332,16.66C9.685,18.014 11.368,18.582 13.279,18.582C13.539,18.582 15.6,18.262 16.836,17.026L17.896,18.086C18.003,18.193 18.163,18.193 18.27,18.086L19.664,16.692C19.86,16.496 19.86,16.199 19.664,16.003L17.472,14.382M12,2C6.477,2 2,6.477 2,12C2,17.523 6.477,22 12,22C17.523,22 22,17.523 22,12C22,6.477 17.523,2 12,2L12,2Z" />
+
+    <!-- Full player -->
+    <div id="full-player" class="fixed inset-0 bg-gray-800 z-50 flex flex-col transform translate-y-full">
+        <header class="p-4 flex items-center space-x-2">
+            <button id="minimize-player-btn" class="p-2 rounded-full hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <span class="flex-1 text-center font-semibold">Reproduciendo</span>
+
+            <div class="flex items-center gap-2">
+                <button id="fav-btn-full" class="p-2 rounded-full hover:bg-gray-700">
+                    <svg id="fav-icon-full" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 19.5l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                    </svg>
+                </button>
+                <button id="add-to-playlist-btn" class="p-2 rounded-full hover:bg-gray-700" title="Agregar a playlist">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 flex items-center justify-center p-4">
+            <div id="player-video-container" class="w-full max-w-md bg-black rounded-lg overflow-hidden shadow-lg">
+                <div id="yt_visible"></div>
+            </div>
+        </div>
+
+        <div class="p-4 text-center">
+            <h3 id="player-title" class="text-xl font-bold truncate">Título de la Canción</h3>
+            <p id="player-artist" class="text-gray-400">Nombre del Artista</p>
+        </div>
+
+        <div class="p-4 pb-8">
+            <div class="flex justify-evenly items-center">
+                <button id="shuffle-btn" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+                    </svg>
+                </button>
+                <button id="prev-btn" class="p-2 rounded-full hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                </button>
+                <button id="play-pause-btn" class="w-16 h-16 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg">
+                    <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                    <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 hidden" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button id="next-btn" class="p-2 rounded-full hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                </button>
+                <button id="loop-btn" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2A8.001 8.001 0 0019.418 15m0 0H15" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini player -->
+    <div id="mini-player" class="fixed bottom-0 left-0 right-0 bg-gray-700 h-16 flex items-center p-2 shadow-lg transform translate-y-full opacity-0 z-40">
+        <div class="flex-1 flex items-center truncate" id="maximize-player-btn">
+            <img id="mini-player-thumb" src="https://placehold.co/40x40/000000/FFFFFF?text=?" alt="thumbnail" class="w-10 h-10 rounded mr-3">
+            <div class="truncate">
+                <p id="mini-player-title" class="font-medium truncate">No hay nada sonando</p>
+                <p id="mini-player-artist" class="text-sm text-gray-300 truncate">...</p>
+            </div>
+        </div>
+        <button id="mini-play-pause-btn" class="p-2 rounded-full hover:bg-gray-600">
+            <svg id="mini-play-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
             </svg>
-            WhatsApp: +51 960 436 357
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="taskbar" role="navigation" aria-label="Barra de tareas">
-    <div class="start-button" id="start-button" onclick="toggleStartMenu()" role="button" aria-haspopup="true" aria-expanded="false" title="Inicio">
-      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#ffffff" d="M3 5.5l7-.7v7.2h-7zM3 12.5l7-.7v7.7l-7-.6zM11.8 4.3l9-1v8.7l-9 .3zM11.8 13.9l9-1v8.1l-9 .4z"></path>
-      </svg>
+            <svg id="mini-pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 hidden" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1z" />
+            </svg>
+        </button>
     </div>
 
-    <div class="start-menu hidden" id="start-menu" role="menu" aria-hidden="true">
-      <div class="menu-item" data-target="servicios">Servicios</div>
-      <div class="menu-item" data-target="portafolio">Portafolio</div>
-      <div class="menu-item" data-target="pagos">Pagos</div>
-      <div class="menu-item" data-target="contacto">Contacto</div>
+    <!-- hidden holder -->
+    <div id="player-iframe-wrapper" class="fixed -z-10 -top-full -left-full">
+        <div id="yt_hidden_holder"></div>
     </div>
 
-    <div style="flex:1"></div>
+    <!-- Toast container (dynamic) -->
+    <div id="toast-root"></div>
 
-    <div class="taskbar-right" aria-live="polite">
-      <div class="pc-icon" title="Equipo" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#ffffff" d="M3 4h18v11H3zM1 20h22v2H1zM5 6v7h14V6z"></path>
-        </svg>
-      </div>
-      <div class="clock" id="taskbar-clock" aria-atomic="true">
-        <div id="taskbar-time">00:00</div>
-        <div id="taskbar-date">dd/mm/yyyy</div>
-      </div>
-    </div>
-  </div>
-  <script src="script.js"></script>
+    <script type="module">
+    /* =====================
+       Config + State
+    ===================== */
+    const CONFIG = {
+      YT_MAX_RESULTS: 15,
+      API_KEYS: [
+         "AIzaSyCzu-Mqx22V83ktalXksUnC1AhtZwzyb-0",
+         "AIzaSyBM-uvKMHe5GxNuMpWB45-RWVUGYOGwEyQ",
+         "AIzaSyAd6JdvYn7YGMfSY9EaJtCEUGd11tKa6ZI",
+         "AIzaSyBr2nxeKaN1q07fMV59zrLEOQx9dzYBsMI",
+         "AIzaSyBbnepAY-irFm35H7Qu0NrwISzLCThkBKM",
+         "AIzaSyAujlR4Gig8puLuzM-amckcwu5sbMRvIR0",
+         "AIzaSyBiGJ9JeOdkrUI7x-qQHyrHpUJAxcwRTvI",
+         "AIzaSyC_UCUc3zcffX5_IOPFpqbJyXmUYxKOg9U",
+         "AIzaSyC7FYbsVmGA0LnepHG7t_xPOR0mEkQ1jiE",
+         "AIzaSyBLTPa7EUAmnJZMq4sYBT97x4HY3--YHws",
+         "AIzaSyDWAi-0_oqg5GHwEoE0_LnSLSV_nsfs1SI",
+         "AIzaSyBJ6zZI3BFvBd02EcdsJFE7dLdZ-f7RV9c",
+         "AIzaSyD_9Flh18VT4hJ0OkEIS3TCECJ4vIOcfC0",
+         "AIzaSyC3_rIZ5deseDbte7auVOo7oUDjopEMaBg",
+         "AIzaSyA9jC-p2NtbeppL8x0YKQqNkrdOggt3Q48"
+      ],
+      STORAGE_PREFIX: 'mp_'
+    };
+
+    const state = {
+        visiblePlayer: null,
+        hiddenPlayer: null,
+        playersReady: false,
+        pendingPlay: null,
+        queuedTrack: null,
+        currentKeyIndex: 0,
+        currentTrack: null,
+        currentQueue: [],
+        currentQueueIndex: 0,
+        favorites: [],
+        playlists: [], // app playlists (local)
+        recents: [], // recent tracks
+        currentPage: 'home',
+        isShuffle: false,
+        isLoop: false,
+        transferInProgress: false,
+        isPlaying: false,
+    };
+
+    const dom = {
+        sidebar: document.getElementById('sidebar'),
+        sidebarBackdrop: document.getElementById('sidebar-backdrop'),
+        openSidebarBtn: document.getElementById('open-sidebar-btn'),
+        closeSidebarBtn: document.getElementById('close-sidebar-btn'),
+        navLinks: document.querySelectorAll('.nav-link'),
+        pageContainer: document.getElementById('page-container'),
+        pages: document.querySelectorAll('.page'),
+        homeTitle: document.getElementById('home-title'),
+
+        searchInput: document.getElementById('search-input'),
+        searchButton: document.getElementById('search-button'),
+        searchPlaylistsButton: document.getElementById('search-playlists-button'),
+        categoryButtons: document.querySelectorAll('.category-btn'),
+
+        popularMusicContainer: document.getElementById('popular-music-container'),
+        resultsContainer: document.getElementById('results-container'),
+        favoritesContainer: document.getElementById('favorites-container'),
+        playlistsContainer: document.getElementById('playlists-container'),
+        appPlaylistsList: document.getElementById('app-playlists-list'),
+        createAppPlaylistLink: document.getElementById('create-app-playlist-link'),
+
+        sidebarRecentsList: document.getElementById('sidebar-recents-list'),
+        recentsContainer: document.getElementById('recents-container'),
+
+        fullPlayer: document.getElementById('full-player'),
+        minimizePlayerBtn: document.getElementById('minimize-player-btn'),
+        playerVideoContainer: document.getElementById('player-video-container'),
+        playerTitle: document.getElementById('player-title'),
+        playerArtist: document.getElementById('player-artist'),
+        favBtnFull: document.getElementById('fav-btn-full'),
+        favIconFull: document.getElementById('fav-icon-full'),
+        addToPlaylistBtn: document.getElementById('add-to-playlist-btn'),
+
+        playPauseBtn: document.getElementById('play-pause-btn'),
+        playIcon: document.getElementById('play-icon'),
+        pauseIcon: document.getElementById('pause-icon'),
+        nextBtn: document.getElementById('next-btn'),
+        prevBtn: document.getElementById('prev-btn'),
+        shuffleBtn: document.getElementById('shuffle-btn'),
+        loopBtn: document.getElementById('loop-btn'),
+
+        miniPlayer: document.getElementById('mini-player'),
+        maximizePlayerBtn: document.getElementById('maximize-player-btn'),
+        miniPlayerThumb: document.getElementById('mini-player-thumb'),
+        miniPlayerTitle: document.getElementById('mini-player-title'),
+        miniPlayerArtist: document.getElementById('mini-player-artist'),
+        miniPlayPauseBtn: document.getElementById('mini-play-pause-btn'),
+        miniPlayIcon: document.getElementById('mini-play-icon'),
+        miniPauseIcon: document.getElementById('mini-pause-icon'),
+
+        playerIframeWrapper: document.getElementById('player-iframe-wrapper'),
+        ytVisibleHolder: document.getElementById('yt_visible'),
+        ytHiddenHolder: document.getElementById('yt_hidden_holder'),
+        toastRoot: document.getElementById('toast-root'),
+    };
+
+    /* =====================
+       YouTube API load + players
+    ===================== */
+    (function loadYT(){
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            document.body.appendChild(tag);
+        } else if (window.YT && window.YT.Player) {
+            if (typeof window.onYouTubeIframeAPIReady === 'function') window.onYouTubeIframeAPIReady();
+        }
+    })();
+
+    window.onYouTubeIframeAPIReady = function() {
+        try {
+            state.visiblePlayer = new YT.Player(dom.ytVisibleHolder, {
+                height: '100%',
+                width: '100%',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 1,
+                    'disablekb': 1,
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'showinfo': 0
+                },
+                events: {
+                    'onReady': onVisibleReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': (e) => console.warn("visiblePlayer error", e)
+                }
+            });
+
+            // Mantener hiddenPlayer por compatibilidad (no se usa automáticamente para minimizar)
+            state.hiddenPlayer = new YT.Player(dom.ytHiddenHolder, {
+                height: '1',
+                width: '1',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 0,
+                    'disablekb': 1,
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'showinfo': 0
+                },
+                events: {
+                    'onReady': onHiddenReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': (e) => console.warn("hiddenPlayer error", e)
+                }
+            });
+        } catch (e) {
+            console.error("YT create error:", e);
+        }
+    };
+
+    function onVisibleReady() { checkPlayersReady(); }
+    function onHiddenReady() { checkPlayersReady(); }
+
+    function checkPlayersReady() {
+        if (!state.visiblePlayer || !state.hiddenPlayer) return;
+        state.playersReady = true;
+        try {
+            const iframeV = state.visiblePlayer.getIframe();
+            const iframeH = state.hiddenPlayer.getIframe();
+            if (iframeV) iframeV.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            if (iframeH) iframeH.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+        } catch (e) {}
+        resizePlayers();
+        if (state.pendingPlay) {
+            const p = state.pendingPlay;
+            state.pendingPlay = null;
+            loadAndPlayById(p.videoId, p.autoplay);
+        }
+        if (state.queuedTrack) {
+            const { video, queue, queueIndex } = state.queuedTrack;
+            state.queuedTrack = null;
+            playTrack(video, queue, queueIndex);
+        }
+    }
+
+    function onPlayerStateChange(event) {
+        const s = event.data;
+        if (s === YT.PlayerState.PLAYING) {
+            setPlayIcon(false);
+            state.isPlaying = true;
+            showMiniPlayerAfterPlay();
+            updateMediaSessionPlaybackState('playing');
+        } else if (s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED) {
+            setPlayIcon(true);
+            state.isPlaying = false;
+            updateMediaSessionPlaybackState('paused');
+        } else if (s === YT.PlayerState.ENDED) {
+            playNext();
+        }
+    }
+
+    /* =====================
+       API helpers (YouTube Data)
+    ===================== */
+    function getApiKey() { return CONFIG.API_KEYS[state.currentKeyIndex % CONFIG.API_KEYS.length]; }
+    function rotateApiKey(){ state.currentKeyIndex = (state.currentKeyIndex + 1) % CONFIG.API_KEYS.length; console.warn('Rotando API key ->', state.currentKeyIndex); }
+
+    function buildApiUrl(endpoint, params) {
+        const BASE_URL = 'https://www.googleapis.com/youtube/v3';
+        const url = new URL(`${BASE_URL}${endpoint}`);
+        for (const key in params) url.searchParams.set(key, params[key]);
+        return url;
+    }
+
+    async function fetchWithRetry(url, retries = 3) {
+        if (retries === 0) throw new Error("Se agotaron reintentos de API.");
+        url.searchParams.set('key', getApiKey());
+        try {
+            const res = await fetch(url);
+            if (!res.ok) {
+                const errorData = await res.json().catch(()=>({error:{message:'unknown', code: res.status}}));
+                const errorCode = errorData.error?.code;
+                if (errorCode === 403 || errorCode === 400) {
+                    rotateApiKey();
+                    url.searchParams.set('key', getApiKey());
+                    return fetchWithRetry(url, retries - 1);
+                } else {
+                    throw new Error(errorData.error?.message || res.statusText);
+                }
+            }
+            return await res.json();
+        } catch (err) {
+            console.error("fetch error:", err);
+            return fetchWithRetry(url, retries - 1);
+        }
+    }
+
+    /* =====================
+       UI helpers
+    ===================== */
+    function showLoading(container){ container.innerHTML = `<div class="flex justify-center items-center p-10"><div class="loader"></div></div>`; }
+
+    function renderVideoList(container, items) {
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-center">No se encontraron resultados.</p>';
+            return;
+        }
+        container.innerHTML = items.map((item, index) => {
+            const videoId = typeof item.id === 'object' ? item.id.videoId : item.id;
+            const snippet = item.snippet;
+            if (!snippet) return '';
+            return `
+                <div class="flex items-center p-2 rounded-lg hover:bg-gray-800 cursor-pointer video-item" data-index="${index}" data-video-id="${videoId}">
+                    <img src="${snippet.thumbnails?.default?.url || 'https://placehold.co/120x90/000000/ffffff?text=?'}" alt="${snippet.title}" class="w-16 h-16 object-cover rounded-md mr-4">
+                    <div class="flex-1 truncate">
+                        <p class="font-medium truncate">${snippet.title}</p>
+                        <p class="text-sm text-gray-400 truncate">${snippet.channelTitle}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.video-item').forEach(itemEl => {
+            itemEl.addEventListener('click', () => {
+                const index = parseInt(itemEl.dataset.index);
+                playTrack(items[index], items, index);
+            });
+        });
+    }
+
+    function renderFavorites() {
+        if (state.favorites.length === 0) {
+            dom.favoritesContainer.innerHTML = '<p class="text-gray-400 text-center">Aún no tienes favoritos. Presiona el ♥️ en una canción para añadirla.</p>';
+            return;
+        }
+        renderVideoList(dom.favoritesContainer, state.favorites);
+    }
+
+    function renderPlaylistList(container, playlists) {
+        if (!playlists || playlists.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-center">No se encontraron playlists.</p>';
+            return;
+        }
+        container.innerHTML = playlists.map(pl => {
+            const sn = pl.snippet || {};
+            const playlistId = (pl.id && pl.id.playlistId) ? pl.id.playlistId : (typeof pl.id === 'string' ? pl.id : (pl.playlistId || ''));
+            return `
+                <div class="bg-gray-800 p-3 rounded cursor-pointer playlist-item" data-playlist-id="${playlistId}" title="${sn.title}">
+                    <img src="${sn.thumbnails?.medium?.url || sn.thumbnails?.default?.url || 'https://placehold.co/320x180/000/fff?text=?'}" class="w-full h-36 object-cover rounded mb-2">
+                    <div class="text-sm font-medium truncate">${sn.title}</div>
+                    <div class="text-xs text-gray-400 truncate">${sn.channelTitle}</div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.playlist-item').forEach(el => {
+            el.addEventListener('click', async () => {
+                const playlistId = el.dataset.playlistId;
+                if (!playlistId) {
+                    dom.resultsContainer.innerHTML = `<p class="text-red-400">ID de playlist inválido.</p>`;
+                    return;
+                }
+                await fetchPlaylistItemsAndRender(playlistId);
+            });
+        });
+    }
+
+    function showPage(pageId) {
+        dom.pages.forEach(page => {
+            if (page.id === `page-${pageId}`) page.classList.add('active');
+            else page.classList.remove('active');
+        });
+        state.currentPage = pageId;
+        dom.pageContainer.scrollTop = 0;
+
+        if (pageId === 'favorites') renderFavorites();
+        else if (pageId === 'home') {
+            dom.homeTitle.textContent = 'Inicio';
+            dom.resultsContainer.innerHTML = '';
+        } else if (pageId === 'recents') {
+            renderRecents();
+        }
+    }
+
+    function toggleSidebar(show) {
+        if (show) {
+            dom.sidebarBackdrop.classList.remove('hidden');
+            dom.sidebar.classList.remove('-translate-x-full');
+        } else {
+            dom.sidebarBackdrop.classList.add('hidden');
+            dom.sidebar.classList.add('-translate-x-full');
+        }
+    }
+
+    function updatePlayerUI(track) {
+        if (!track || !track.snippet) return;
+        const title = track.snippet.title;
+        const artist = track.snippet.channelTitle;
+        const thumb = track.snippet.thumbnails?.default?.url || 'https://placehold.co/40x40/000000/FFFFFF?text=?';
+
+        dom.playerTitle.textContent = title;
+        dom.playerArtist.textContent = artist;
+
+        dom.miniPlayerTitle.textContent = title;
+        dom.miniPlayerArtist.textContent = artist;
+        dom.miniPlayerThumb.src = thumb;
+
+        updateFavoriteIcon();
+    }
+
+    function showFullPlayer() {
+        dom.fullPlayer.classList.remove('translate-y-full');
+        dom.miniPlayer.classList.add('translate-y-full','opacity-0');
+        setTimeout(()=> resizePlayers(), 80);
+    }
+
+    function showMiniPlayerAfterPlay() {
+        dom.miniPlayer.classList.remove('translate-y-full','opacity-0');
+    }
+
+    function showMiniPlayer() {
+        dom.fullPlayer.classList.add('translate-y-full');
+        dom.miniPlayer.classList.remove('translate-y-full','opacity-0');
+        setTimeout(()=> resizePlayers(), 120);
+    }
+
+    function setPlayIcon(isPaused) {
+        dom.playIcon.classList.toggle('hidden', !isPaused);
+        dom.pauseIcon.classList.toggle('hidden', isPaused);
+        dom.miniPlayIcon.classList.toggle('hidden', !isPaused);
+        dom.miniPauseIcon.classList.toggle('hidden', isPaused);
+    }
+
+    function updateFavoriteIcon() {
+        if (!state.currentTrack) return;
+        const videoId = typeof state.currentTrack.id === 'object' ? state.currentTrack.id.videoId : state.currentTrack.id;
+        const isFav = state.favorites.some(fav => (typeof fav.id === 'object' ? fav.id.videoId : fav.id) === videoId);
+        if (isFav) dom.favIconFull.classList.add('fill-red-500','text-red-500');
+        else dom.favIconFull.classList.remove('fill-red-500','text-red-500');
+    }
+
+    function updateShuffleLoopIcons() {
+        dom.shuffleBtn.classList.toggle('text-blue-500', state.isShuffle);
+        dom.loopBtn.classList.toggle('text-blue-500', state.isLoop);
+    }
+
+    /* =====================
+       Media Session integration
+    ===================== */
+    function updateMediaSessionMetadata() {
+        try {
+            if (!('mediaSession' in navigator)) return;
+            if (!state.currentTrack || !state.currentTrack.snippet) return;
+            const s = state.currentTrack.snippet;
+            const artwork = s.thumbnails?.maxres?.url || s.thumbnails?.high?.url || s.thumbnails?.default?.url || '';
+
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: s.title,
+                artist: s.channelTitle || '',
+                album: s.channelTitle || '',
+                artwork: [
+                    { src: artwork, sizes: '512x512', type: 'image/jpeg' },
+                    { src: artwork, sizes: '256x256', type: 'image/jpeg' }
+                ]
+            });
+        } catch (e) { console.warn('mediaSession metadata error', e); }
+    }
+
+    function updateMediaSessionPlaybackState(stateStr) {
+        try {
+            if (!('mediaSession' in navigator)) return;
+            navigator.mediaSession.playbackState = stateStr; // "playing" | "paused" | "none"
+        } catch (e) {}
+    }
+
+    // Set action handlers once (they call existing functions)
+    if ('mediaSession' in navigator) {
+        try {
+            navigator.mediaSession.setActionHandler('play', () => { togglePlayPause(); });
+            navigator.mediaSession.setActionHandler('pause', () => { togglePlayPause(); });
+            navigator.mediaSession.setActionHandler('previoustrack', () => { playPrev(); });
+            navigator.mediaSession.setActionHandler('nexttrack', () => { playNext(); });
+            navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                const skip = (details && details.seekOffset) || 10;
+                const active = getActivePlayer();
+                if (active && typeof active.getCurrentTime === 'function') {
+                    const pos = active.getCurrentTime();
+                    active.seekTo(Math.max(0, pos - skip), true);
+                }
+            });
+            navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                const skip = (details && details.seekOffset) || 10;
+                const active = getActivePlayer();
+                if (active && typeof active.getCurrentTime === 'function') {
+                    const pos = active.getCurrentTime();
+                    active.seekTo(pos + skip, true);
+                }
+            });
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+                const active = getActivePlayer();
+                if (active && typeof active.seekTo === 'function') {
+                    active.seekTo(details.seekTime, true);
+                }
+            });
+        } catch(e){ console.warn('setActionHandler error', e); }
+    }
+
+    /* =====================
+       Player size / utility
+    ===================== */
+    function resizePlayers() {
+        try {
+            if (state.visiblePlayer && state.visiblePlayer.getIframe) {
+                const iframe = state.visiblePlayer.getIframe();
+                const w = dom.playerVideoContainer.clientWidth;
+                const h = dom.playerVideoContainer.clientHeight;
+                if (typeof state.visiblePlayer.setSize === 'function') state.visiblePlayer.setSize(w, h);
+                if (iframe) { iframe.style.width = '100%'; iframe.style.height = '100%'; }
+            }
+        } catch(e){ console.warn('resizePlayers error', e); }
+    }
+    window.addEventListener('resize', () => { resizePlayers(); });
+
+    /* =====================
+       Playback control (avoid dual audio, smooth transfer)
+    ===================== */
+    function getActivePlayer() {
+        // always use visiblePlayer as the active controller to avoid cut during minimize.
+        return state.visiblePlayer || state.hiddenPlayer || null;
+    }
+
+    function stopBothPlayers() {
+        try { if (state.visiblePlayer && state.visiblePlayer.stopVideo) state.visiblePlayer.stopVideo(); } catch(e){}
+        try { if (state.hiddenPlayer && state.hiddenPlayer.stopVideo) state.hiddenPlayer.stopVideo(); } catch(e){}
+    }
+
+    async function crossfadePlayers(source, target, videoId, startTime = 0, autoplay = true) {
+        if (!target || !target.loadVideoById) {
+            try { target.loadVideoById({videoId, startSeconds: startTime}); if (autoplay) target.playVideo(); } catch(e){}
+            return;
+        }
+        try {
+            target.loadVideoById({ videoId, startSeconds: startTime });
+            try { target.setVolume(0); } catch(e){}
+            if (autoplay) { setTimeout(()=>{ try{ target.playVideo(); }catch(e){} }, 80); }
+            const steps = 6;
+            const stepMs = 50;
+            let i = 0;
+            const fade = setInterval(()=>{
+                i++;
+                const tVol = Math.min(100, Math.round((i/steps)*100));
+                const sVol = Math.max(0, 100 - tVol);
+                try { target.setVolume(tVol); } catch(e){}
+                try { if (source && source.setVolume) source.setVolume(sVol); } catch(e){}
+                if (i >= steps) {
+                    clearInterval(fade);
+                    try { if (source && source.stopVideo) source.stopVideo(); } catch(e){}
+                    try { if (target && target.setVolume) target.setVolume(100); } catch(e){}
+                }
+            }, stepMs);
+        } catch (err) {
+            console.error('crossfade error', err);
+        }
+    }
+
+    function loadAndPlayById(videoId, autoplay = true) {
+        if (!videoId) return;
+        if (!state.playersReady) {
+            state.pendingPlay = { videoId, autoplay };
+            return;
+        }
+
+        const target = state.visiblePlayer; // always use visiblePlayer
+        const other = state.hiddenPlayer;
+
+        try {
+            // If other is playing for some reason, crossfade; otherwise stop other and load target.
+            const otherState = (other && other.getPlayerState) ? other.getPlayerState() : -1;
+            if (otherState === YT.PlayerState.PLAYING) {
+                const currentTime = (typeof other.getCurrentTime === 'function') ? other.getCurrentTime() : 0;
+                crossfadePlayers(other, target, videoId, currentTime, autoplay);
+            } else {
+                try { if (other && other.stopVideo) other.stopVideo(); } catch(e){}
+                if (typeof target.loadVideoById === 'function') {
+                    target.loadVideoById({ videoId, startSeconds: 0 });
+                    if (autoplay) setTimeout(()=>{ try{ target.playVideo(); }catch(e){} }, 60);
+                } else if (typeof target.cueVideoById === 'function') {
+                    target.cueVideoById({ videoId, startSeconds: 0 });
+                    if (autoplay) setTimeout(()=>{ try{ target.playVideo(); }catch(e){} }, 60);
+                } else {
+                    console.warn("Target player API incompleta");
+                }
+            }
+        } catch (e) {
+            console.error("Error loadAndPlayById:", e);
+        }
+    }
+
+    function playTrack(video, queue = [], queueIndex = 0) {
+        const videoId = typeof video.id === 'object' ? video.id.videoId : video.id;
+        if (!videoId) { console.error("No videoId:", video); return; }
+
+        if (!state.playersReady) {
+            state.queuedTrack = { video, queue, queueIndex };
+            updatePlayerUI(video);
+            showFullPlayer();
+            setPlayIcon(true);
+            return;
+        }
+
+        state.currentTrack = video;
+        state.currentQueue = queue;
+        state.currentQueueIndex = queueIndex;
+        state.queuedTrack = null;
+
+        // add to recents (first) and persist
+        addToRecents(video);
+
+        loadAndPlayById(videoId, true);
+        updatePlayerUI(video);
+        updateMediaSessionMetadata(); // <- actualización de metadata para pantalla de bloqueo / notificación
+        updateMediaSessionPlaybackState('playing');
+        showFullPlayer();
+    }
+
+    function togglePlayPause() {
+        if (!state.playersReady && state.queuedTrack) {
+            const { video, queue, queueIndex } = state.queuedTrack;
+            playTrack(video, queue, queueIndex);
+            return;
+        }
+        const active = getActivePlayer();
+        if (!active || !state.currentTrack) return;
+        const st = (typeof active.getPlayerState === 'function') ? active.getPlayerState() : -1;
+        if (st === YT.PlayerState.PLAYING) active.pauseVideo();
+        else active.playVideo();
+    }
+
+    function playNext() {
+        if (!state.currentQueue.length) return;
+        if (state.isLoop) {
+            playTrack(state.currentTrack, state.currentQueue, state.currentQueueIndex);
+            return;
+        }
+        let nextIndex;
+        if (state.isShuffle) nextIndex = Math.floor(Math.random() * state.currentQueue.length);
+        else {
+            nextIndex = state.currentQueueIndex + 1;
+            if (nextIndex >= state.currentQueue.length) nextIndex = 0;
+        }
+        playTrack(state.currentQueue[nextIndex], state.currentQueue, nextIndex);
+    }
+
+    function playPrev() {
+        if (!state.currentQueue.length) return;
+        let prevIndex;
+        if (state.isShuffle) prevIndex = Math.floor(Math.random() * state.currentQueue.length);
+        else {
+            prevIndex = state.currentQueueIndex - 1;
+            if (prevIndex < 0) prevIndex = state.currentQueue.length - 1;
+        }
+        playTrack(state.currentQueue[prevIndex], state.currentQueue, prevIndex);
+    }
+
+    function toggleShuffle() { state.isShuffle = !state.isShuffle; updateShuffleLoopIcons(); }
+    function toggleLoop() { state.isLoop = !state.isLoop; updateShuffleLoopIcons(); }
+
+    /* =====================
+       Transfer playback function (left in case needed)
+    ===================== */
+    function transferPlayback(toHidden) {
+        // left implemented but not called automatically to avoid cuts on minimize
+        if (state.transferInProgress) return;
+        if (!state.playersReady) return;
+        state.transferInProgress = true;
+
+        const source = toHidden ? state.visiblePlayer : state.hiddenPlayer;
+        const target = toHidden ? state.hiddenPlayer : state.visiblePlayer;
+
+        try {
+            if (!source || !target || !state.currentTrack) { state.transferInProgress = false; return; }
+
+            const srcState = (source.getPlayerState) ? source.getPlayerState() : -1;
+            const isPlaying = srcState === YT.PlayerState.PLAYING;
+            const currentTime = (source.getCurrentTime) ? source.getCurrentTime() : 0;
+            crossfadePlayers(source, target, (typeof state.currentTrack.id === 'object' ? state.currentTrack.id.videoId : state.currentTrack.id), currentTime, isPlaying);
+            setTimeout(()=>{ state.transferInProgress = false; }, 600);
+        } catch (err) {
+            console.error('Transfer error:', err);
+            state.transferInProgress = false;
+        }
+    }
+
+    /* =====================
+       Favorites localStorage
+    ===================== */
+    function loadFavorites() {
+        const favs = localStorage.getItem(`${CONFIG.STORAGE_PREFIX}favorites`);
+        if (favs) state.favorites = JSON.parse(favs);
+    }
+    function saveFavorites() { localStorage.setItem(`${CONFIG.STORAGE_PREFIX}favorites`, JSON.stringify(state.favorites)); }
+
+    function toggleFavorite() {
+        if (!state.currentTrack) return;
+        const videoId = typeof state.currentTrack.id === 'object' ? state.currentTrack.id.videoId : state.currentTrack.id;
+        const favIndex = state.favorites.findIndex(fav => (typeof fav.id === 'object' ? fav.id.videoId : fav.id) === videoId);
+        if (favIndex > -1) state.favorites.splice(favIndex,1);
+        else state.favorites.push(state.currentTrack);
+        saveFavorites();
+        updateFavoriteIcon();
+        if (state.currentPage === 'favorites') renderFavorites();
+    }
+
+    /* =====================
+       App Playlists (local) - persistencia + UI
+    ===================== */
+    function loadAppPlaylists() {
+        const raw = localStorage.getItem(`${CONFIG.STORAGE_PREFIX}playlists`);
+        if (raw) state.playlists = JSON.parse(raw);
+        else state.playlists = [];
+        renderAppPlaylistsSidebar();
+    }
+    function saveAppPlaylists() { localStorage.setItem(`${CONFIG.STORAGE_PREFIX}playlists`, JSON.stringify(state.playlists)); }
+
+    function createAppPlaylist(name) {
+        if (!name || !name.trim()) return null;
+        const id = `pl_${Date.now()}`;
+        const pl = { id, name: name.trim(), items: [] };
+        state.playlists.push(pl);
+        saveAppPlaylists();
+        renderAppPlaylistsSidebar();
+        showToast(`Playlist "${pl.name}" creada`);
+        return pl;
+    }
+
+    function renderAppPlaylistsSidebar() {
+        const container = dom.appPlaylistsList;
+        if (!container) return;
+        if (!state.playlists.length) {
+            container.innerHTML = `<p class="text-xs text-gray-400">No hay playlists locales. Crea una con "Crear Playlist".</p>`;
+            return;
+        }
+        container.innerHTML = state.playlists.map(pl => {
+            return `<div class="flex items-center justify-between bg-gray-800 p-2 rounded cursor-pointer app-playlist-item" data-app-playlist-id="${pl.id}">
+                        <div class="truncate text-sm">${pl.name}</div>
+                        <div class="text-xs text-gray-400">${pl.items.length}</div>
+                    </div>`;
+        }).join('');
+        container.querySelectorAll('.app-playlist-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const plId = el.dataset.appPlaylistId;
+                const pl = state.playlists.find(x => x.id === plId);
+                if (!pl) return;
+                if (!pl.items.length) {
+                    dom.resultsContainer.innerHTML = `<p class="text-gray-400 text-center">Playlist "${pl.name}" vacía.</p>`;
+                    dom.homeTitle.textContent = `Playlist: ${pl.name}`;
+                    showPage('home');
+                    return;
+                }
+                dom.homeTitle.textContent = `Playlist: ${pl.name}`;
+                renderVideoList(dom.resultsContainer, pl.items);
+                showPage('home');
+            });
+        });
+    }
+
+    function addCurrentTrackToAppPlaylist(playlistId) {
+        if (!state.currentTrack) { showToast('No hay canción seleccionada.'); return; }
+        const pl = state.playlists.find(x => x.id === playlistId);
+        if (!pl) { showToast('Playlist no encontrada.'); return; }
+        const videoId = typeof state.currentTrack.id === 'object' ? state.currentTrack.id.videoId : state.currentTrack.id;
+        const exists = pl.items.some(it => (typeof it.id === 'object' ? it.id.videoId : it.id) === videoId);
+        if (exists) { showToast('La canción ya está en la playlist.'); return; }
+        pl.items.push(state.currentTrack);
+        saveAppPlaylists();
+        renderAppPlaylistsSidebar();
+        showToast(`Añadido a "${pl.name}"`);
+    }
+
+    /* =====================
+       Recents (localStorage)
+    ===================== */
+    function loadRecents() {
+        const raw = localStorage.getItem(`${CONFIG.STORAGE_PREFIX}recents`);
+        if (raw) state.recents = JSON.parse(raw);
+        else state.recents = [];
+        renderRecentsSidebar();
+    }
+    function saveRecents() { localStorage.setItem(`${CONFIG.STORAGE_PREFIX}recents`, JSON.stringify(state.recents)); }
+
+    function addToRecents(video) {
+        try {
+            const id = typeof video.id === 'object' ? video.id.videoId : video.id;
+            if (!id) return;
+            // quitar duplicados iguales (por id) y añadir al inicio
+            state.recents = state.recents.filter(it => ((typeof it.id === 'object' ? it.id.videoId : it.id) !== id));
+            state.recents.unshift(video);
+            // limitar a 50
+            if (state.recents.length > 50) state.recents.length = 50;
+            saveRecents();
+            renderRecentsSidebar();
+        } catch(e){ console.warn('addToRecents error', e); }
+    }
+
+    function renderRecentsSidebar() {
+        const container = dom.sidebarRecentsList;
+        if (!container) return;
+        if (!state.recents.length) {
+            container.innerHTML = `<div class="text-xs text-gray-400">No hay canciones recientes.</div>`;
+            return;
+        }
+        // mostrar hasta 6 en sidebar
+        container.innerHTML = state.recents.slice(0,6).map(it => {
+            const title = it.snippet?.title || 'Untitled';
+            const ch = it.snippet?.channelTitle || '';
+            return `<div class="truncate recent-item" title="${title} - ${ch}">${title}</div>`;
+        }).join('');
+    }
+
+    function renderRecents() {
+        if (!state.recents.length) {
+            dom.recentsContainer.innerHTML = '<p class="text-gray-400 text-center">No has reproducido canciones todavía.</p>';
+            return;
+        }
+        renderVideoList(dom.recentsContainer, state.recents);
+    }
+
+    /* =====================
+       YouTube Data: popular, search, playlists
+    ===================== */
+    async function fetchPopularMusic() {
+        showLoading(dom.popularMusicContainer);
+        try {
+            const url = buildApiUrl('/videos', {
+                part: 'snippet,contentDetails,statistics',
+                chart: 'mostPopular',
+                videoCategoryId: '10',
+                regionCode: 'US',
+                maxResults: CONFIG.YT_MAX_RESULTS
+            });
+            const data = await fetchWithRetry(url);
+            renderVideoList(dom.popularMusicContainer, data.items || []);
+        } catch (error) {
+            console.error("Error al cargar música popular:", error);
+            dom.popularMusicContainer.innerHTML = `<p class="text-red-400">Error al cargar la música popular.</p>`;
+        }
+    }
+
+    async function fetchVideosByQuery(query) {
+        dom.popularMusicContainer.classList.add('hidden');
+        showLoading(dom.resultsContainer);
+        dom.homeTitle.textContent = `Resultados para: "${query}"`;
+        try {
+            const url = buildApiUrl('/search', {
+                part: 'snippet',
+                q: query,
+                type: 'video',
+                videoCategoryId: '10',
+                maxResults: CONFIG.YT_MAX_RESULTS
+            });
+            const data = await fetchWithRetry(url);
+            renderVideoList(dom.resultsContainer, data.items || []);
+        } catch (error) {
+            console.error("Error al buscar videos:", error);
+            dom.resultsContainer.innerHTML = `<p class="text-red-400">Error al buscar videos.</p>`;
+        }
+    }
+
+    /* Playlists from YouTube (search for playlists by name) */
+    async function fetchPlaylistsByQuery(query) {
+        dom.popularMusicContainer.classList.add('hidden');
+        showLoading(dom.playlistsContainer);
+        try {
+            const url = buildApiUrl('/search', {
+                part: 'snippet',
+                q: query,
+                type: 'playlist',
+                maxResults: 12
+            });
+            const data = await fetchWithRetry(url);
+            renderPlaylistList(dom.playlistsContainer, data.items || []);
+        } catch (err) {
+            console.error('Error playlists:', err);
+            dom.playlistsContainer.innerHTML = `<p class="text-red-400">Error al cargar playlists.</p>`;
+        }
+    }
+
+    async function fetchPlaylistItemsAndRender(playlistId) {
+        dom.resultsContainer.innerHTML = '';
+        showLoading(dom.resultsContainer);
+        try {
+            const url = buildApiUrl('/playlistItems', {
+                part: 'snippet,contentDetails',
+                playlistId,
+                maxResults: CONFIG.YT_MAX_RESULTS
+            });
+            const data = await fetchWithRetry(url);
+            const items = (data.items || []).map(it => {
+                return { id: { videoId: it.contentDetails.videoId }, snippet: it.snippet };
+            });
+            renderVideoList(dom.resultsContainer, items);
+            dom.homeTitle.textContent = 'Playlist';
+        } catch (err) {
+            console.error('Error playlist items:', err);
+            dom.resultsContainer.innerHTML = `<p class="text-red-400">Error al cargar los videos de la playlist.</p>`;
+        }
+    }
+
+    /* =====================
+       Modal & Toast helpers
+    ===================== */
+    function openCreatePlaylistModal() {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <h3>Crear Playlist</h3>
+            <div>
+                <label class="text-xs text-gray-400">Nombre</label>
+                <input id="modal-create-playlist-input" class="w-full bg-gray-700 rounded p-2 mt-2" placeholder="Nombre de la playlist" />
+            </div>
+            <div class="flex gap-2 mt-4 justify-end">
+                <button id="modal-create-confirm" class="px-3 py-1 bg-blue-600 rounded">Crear</button>
+                <button id="modal-create-cancel" class="px-3 py-1 bg-gray-600 rounded">Cancelar</button>
+            </div>
+        `;
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+
+        modal.querySelector('#modal-create-cancel').addEventListener('click', () => {
+            document.body.removeChild(backdrop);
+        });
+        modal.querySelector('#modal-create-confirm').addEventListener('click', () => {
+            const val = modal.querySelector('#modal-create-playlist-input').value.trim();
+            if (!val) { showToast('Ingresa un nombre válido'); return; }
+            createAppPlaylist(val);
+            document.body.removeChild(backdrop);
+        });
+    }
+
+    function openAddToPlaylistModal() {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `<h3>Añadir a playlist</h3><div id="modal-content"><p class="text-xs text-gray-400 mb-2">Elige una playlist local donde añadir la canción actual:</p></div>
+            <div class="flex gap-2 mt-4">
+                <button id="modal-add-btn" class="px-3 py-1 bg-blue-600 rounded">Añadir</button>
+                <button id="modal-new-btn" class="px-3 py-1 bg-green-600 rounded">Crear nueva</button>
+                <button id="modal-cancel-btn" class="px-3 py-1 bg-gray-600 rounded">Cancelar</button>
+            </div>`;
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+
+        const content = modal.querySelector('#modal-content');
+        if (!state.playlists.length) {
+            content.innerHTML += `<p class="text-sm text-gray-300">No hay playlists locales. Puedes crear una nueva.</p>`;
+        } else {
+            const select = document.createElement('select');
+            select.className = 'w-full bg-gray-700 text-white rounded p-2';
+            select.id = 'modal-playlist-select';
+            select.innerHTML = state.playlists.map(pl => `<option value="${pl.id}">${pl.name} (${pl.items.length})</option>`).join('');
+            content.appendChild(select);
+        }
+
+        modal.querySelector('#modal-cancel-btn').addEventListener('click', () => {
+            document.body.removeChild(backdrop);
+        });
+
+        modal.querySelector('#modal-new-btn').addEventListener('click', () => {
+            const name = prompt('Nombre de la nueva playlist:'); // quick fallback inside modal - could reuse create modal
+            if (name && name.trim()) {
+                const pl = createAppPlaylist(name.trim());
+                document.body.removeChild(backdrop);
+                if (pl) showToast(`Playlist "${pl.name}" creada.`);
+            }
+        });
+
+        modal.querySelector('#modal-add-btn').addEventListener('click', () => {
+            if (!state.playlists.length) {
+                showToast('No hay playlists locales. Crea una primero.');
+                return;
+            }
+            const selectEl = document.getElementById('modal-playlist-select');
+            if (!selectEl) {
+                showToast('Seleccione una playlist válida.');
+                return;
+            }
+            const plId = selectEl.value;
+            addCurrentTrackToAppPlaylist(plId);
+            document.body.removeChild(backdrop);
+        });
+    }
+
+    function showToast(text, ms = 2500) {
+        try {
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = text;
+            dom.toastRoot.appendChild(t);
+            setTimeout(()=> {
+                t.style.transition = 'opacity 300ms';
+                t.style.opacity = '0';
+                setTimeout(()=> { if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+            }, ms);
+        } catch(e){ console.warn('toast error', e); }
+    }
+
+    /* =====================
+       Event listeners & init
+    ===================== */
+    function initApp() {
+        dom.openSidebarBtn.addEventListener('click', () => toggleSidebar(true));
+        dom.closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+        dom.sidebarBackdrop.addEventListener('click', () => toggleSidebar(false));
+
+        dom.navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                showPage(e.currentTarget.dataset.page);
+                toggleSidebar(false);
+            });
+        });
+
+        dom.searchButton.addEventListener('click', () => {
+            const query = dom.searchInput.value.trim();
+            if (query) {
+                fetchVideosByQuery(query);
+                showPage('home');
+            }
+        });
+        dom.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') dom.searchButton.click();
+        });
+
+        dom.searchPlaylistsButton.addEventListener('click', () => {
+            const query = dom.searchInput.value.trim() || 'Top playlists';
+            fetchPlaylistsByQuery(query);
+            showPage('home');
+        });
+
+        dom.categoryButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                fetchVideosByQuery(button.dataset.category + " music");
+                showPage('home');
+            });
+        });
+
+        // MINIMIZE: no transfer to avoid corte -> solo ocultamos UI, el visiblePlayer sigue reproduciendo
+        dom.minimizePlayerBtn.addEventListener('click', ()=>{
+            showMiniPlayer();
+        });
+        // MAXIMIZE: no transfer (visiblePlayer is still playing)
+        dom.maximizePlayerBtn.addEventListener('click', ()=>{
+            showFullPlayer();
+        });
+
+        dom.playPauseBtn.addEventListener('click', togglePlayPause);
+        dom.miniPlayPauseBtn.addEventListener('click', togglePlayPause);
+
+        dom.nextBtn.addEventListener('click', playNext);
+        dom.prevBtn.addEventListener('click', playPrev);
+        dom.shuffleBtn.addEventListener('click', toggleShuffle);
+        dom.loopBtn.addEventListener('click', toggleLoop);
+
+        dom.favBtnFull.addEventListener('click', toggleFavorite);
+
+        dom.addToPlaylistBtn.addEventListener('click', () => openAddToPlaylistModal());
+
+        dom.createAppPlaylistLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            openCreatePlaylistModal();
+        });
+
+        // init storage data + fetch
+        loadFavorites();
+        loadAppPlaylists();
+        loadRecents();
+        fetchPopularMusic();
+        fetchPlaylistsByQuery('Top music');
+
+        // Registrar service worker (para PWA)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+                console.log('ServiceWorker registrado', reg);
+            }).catch(err => {
+                console.warn('ServiceWorker fallo:', err);
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
 </body>
 </html>
