@@ -448,10 +448,12 @@
             state.isPlaying = true;
             showMiniPlayerAfterPlay();
             updateMediaSessionPlaybackState('playing');
+            _callShowNotificationForCurrentTrack();
         } else if (s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED) {
             setPlayIcon(true);
             state.isPlaying = false;
             updateMediaSessionPlaybackState('paused');
+            _callShowNotificationForCurrentTrack(); // update notification to paused state
         } else if (s === YT.PlayerState.ENDED) {
             playNext();
         }
@@ -650,7 +652,7 @@
             if (!('mediaSession' in navigator)) return;
             if (!state.currentTrack || !state.currentTrack.snippet) return;
             const s = state.currentTrack.snippet;
-            const artwork = s.thumbnails?.maxres?.url || s.thumbnails?.high?.url || s.thumbnails?.default?.url || '';
+            const artwork = s.thumbnails?.maxres?.url || s.thumbnails?.high?.url || s.thumbnails?.default?.url || '/icon-192.png';
 
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: s.title,
@@ -704,6 +706,80 @@
     }
 
     /* =====================
+       Notifications via Service Worker
+       (show persistent notification with media actions)
+    ===================== */
+
+    async function ensureNotificationPermission() {
+      if (!('Notification' in window)) return false;
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      try {
+        const p = await Notification.requestPermission();
+        return p === 'granted';
+      } catch (e) { return false; }
+    }
+
+    async function showMediaNotification({ title, artist, artwork, isPlaying = true, tag = 'mp-media' } = {}) {
+      if (!('serviceWorker' in navigator) || !('showNotification' in ServiceWorkerRegistration.prototype)) return;
+      const hasPerm = await ensureNotificationPermission();
+      if (!hasPerm) return;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+
+      const actions = [
+        { action: 'prev', title: '◄' },
+        { action: 'play_pause', title: isPlaying ? 'Pausa' : 'Reproducir' },
+        { action: 'next', title: '►' }
+      ];
+
+      registration.showNotification(title || 'Reproduciendo', {
+        body: artist || '',
+        icon: artwork || '/icon-192.png',
+        badge: artwork || '/icon-192.png',
+        image: artwork || undefined,
+        tag,
+        renotify: true,
+        silent: false,
+        data: { date: Date.now() },
+        actions
+      }).catch(err => console.warn('showNotification error', err));
+    }
+
+    async function closeMediaNotification(tag = 'mp-media') {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) return;
+        const notifications = await registration.getNotifications({ tag });
+        notifications.forEach(n => n.close());
+      } catch (e) { console.warn('closeMediaNotification error', e); }
+    }
+
+    // Receive messages from service worker (actions from notification buttons)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (ev) => {
+        const msg = ev.data;
+        if (!msg || msg.type !== 'media-action') return;
+        const action = msg.action;
+        if (action === 'play_pause') togglePlayPause();
+        else if (action === 'next') playNext();
+        else if (action === 'prev') playPrev();
+      });
+    }
+
+    function _callShowNotificationForCurrentTrack() {
+      try {
+        if (!state.currentTrack) {
+          closeMediaNotification();
+          return;
+        }
+        const s = state.currentTrack.snippet || {};
+        const art = s.thumbnails?.high?.url || s.thumbnails?.default?.url || '/icon-192.png';
+        showMediaNotification({ title: s.title, artist: s.channelTitle, artwork: art, isPlaying: state.isPlaying });
+      } catch (e) { console.warn('notify call error', e); }
+    }
+
+    /* =====================
        Player size / utility
     ===================== */
     function resizePlayers() {
@@ -723,7 +799,6 @@
        Playback control (avoid dual audio, smooth transfer)
     ===================== */
     function getActivePlayer() {
-        // always use visiblePlayer as the active controller to avoid cut during minimize.
         return state.visiblePlayer || state.hiddenPlayer || null;
     }
 
@@ -768,11 +843,10 @@
             return;
         }
 
-        const target = state.visiblePlayer; // always use visiblePlayer
+        const target = state.visiblePlayer;
         const other = state.hiddenPlayer;
 
         try {
-            // If other is playing for some reason, crossfade; otherwise stop other and load target.
             const otherState = (other && other.getPlayerState) ? other.getPlayerState() : -1;
             if (otherState === YT.PlayerState.PLAYING) {
                 const currentTime = (typeof other.getCurrentTime === 'function') ? other.getCurrentTime() : 0;
@@ -811,13 +885,13 @@
         state.currentQueueIndex = queueIndex;
         state.queuedTrack = null;
 
-        // add to recents (first) and persist
         addToRecents(video);
 
         loadAndPlayById(videoId, true);
         updatePlayerUI(video);
-        updateMediaSessionMetadata(); // <- actualización de metadata para pantalla de bloqueo / notificación
+        updateMediaSessionMetadata();
         updateMediaSessionPlaybackState('playing');
+        _callShowNotificationForCurrentTrack();
         showFullPlayer();
     }
 
@@ -867,7 +941,6 @@
        Transfer playback function (left in case needed)
     ===================== */
     function transferPlayback(toHidden) {
-        // left implemented but not called automatically to avoid cuts on minimize
         if (state.transferInProgress) return;
         if (!state.playersReady) return;
         state.transferInProgress = true;
@@ -990,10 +1063,8 @@
         try {
             const id = typeof video.id === 'object' ? video.id.videoId : video.id;
             if (!id) return;
-            // quitar duplicados iguales (por id) y añadir al inicio
             state.recents = state.recents.filter(it => ((typeof it.id === 'object' ? it.id.videoId : it.id) !== id));
             state.recents.unshift(video);
-            // limitar a 50
             if (state.recents.length > 50) state.recents.length = 50;
             saveRecents();
             renderRecentsSidebar();
@@ -1007,7 +1078,6 @@
             container.innerHTML = `<div class="text-xs text-gray-400">No hay canciones recientes.</div>`;
             return;
         }
-        // mostrar hasta 6 en sidebar
         container.innerHTML = state.recents.slice(0,6).map(it => {
             const title = it.snippet?.title || 'Untitled';
             const ch = it.snippet?.channelTitle || '';
@@ -1064,7 +1134,6 @@
         }
     }
 
-    /* Playlists from YouTube (search for playlists by name) */
     async function fetchPlaylistsByQuery(query) {
         dom.popularMusicContainer.classList.add('hidden');
         showLoading(dom.playlistsContainer);
@@ -1208,7 +1277,7 @@
     /* =====================
        Event listeners & init
     ===================== */
-    function initApp() {
+    async function initApp() {
         dom.openSidebarBtn.addEventListener('click', () => toggleSidebar(true));
         dom.closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
         dom.sidebarBackdrop.addEventListener('click', () => toggleSidebar(false));
@@ -1245,14 +1314,8 @@
             });
         });
 
-        // MINIMIZE: no transfer to avoid corte -> solo ocultamos UI, el visiblePlayer sigue reproduciendo
-        dom.minimizePlayerBtn.addEventListener('click', ()=>{
-            showMiniPlayer();
-        });
-        // MAXIMIZE: no transfer (visiblePlayer is still playing)
-        dom.maximizePlayerBtn.addEventListener('click', ()=>{
-            showFullPlayer();
-        });
+        dom.minimizePlayerBtn.addEventListener('click', ()=>{ showMiniPlayer(); });
+        dom.maximizePlayerBtn.addEventListener('click', ()=>{ showFullPlayer(); });
 
         dom.playPauseBtn.addEventListener('click', togglePlayPause);
         dom.miniPlayPauseBtn.addEventListener('click', togglePlayPause);
@@ -1278,14 +1341,18 @@
         fetchPopularMusic();
         fetchPlaylistsByQuery('Top music');
 
-        // Registrar service worker (para PWA)
+        // Registrar service worker (para PWA + notificaciones)
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-                console.log('ServiceWorker registrado', reg);
-            }).catch(err => {
+            try {
+                await navigator.serviceWorker.register('/sw.js');
+                console.log('ServiceWorker registrado');
+            } catch (err) {
                 console.warn('ServiceWorker fallo:', err);
-            });
+            }
         }
+
+        // solicitar permiso notificaciones de forma opcional al iniciar (silencioso)
+        try { await ensureNotificationPermission(); } catch(e){}
     }
 
     document.addEventListener('DOMContentLoaded', initApp);
